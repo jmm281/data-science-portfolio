@@ -43,4 +43,4 @@ Python, TensorFlow, Keras, Scikit-learn
 ---
 
 ## Notebooks
-All experiments are located in the `/notebooks` folder, each corresponding to a specific architecture.
+All experiments are located in the `/notebooks` folder, each corresponding to a specific architecture. More notebooks will be added to this repository when further testing is completed for each of them.
