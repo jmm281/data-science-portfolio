@@ -1,27 +1,39 @@
 # Skin Cancer Classification using Deep Learning
 
 ## Objective
-Development of a deep learning model for multiclass classification of skin lesions using the HAM10000 dataset.
+Development and benchmarking of multiple deep learning architectures for multiclass skin lesion classification using the HAM10000 dataset.
 
 ---
 
-## Methodology
+## Project Structure
+This project evaluates and compares multiple CNN architectures (12 models in total), including baseline and state-of-the-art models.
 
-### Research & Model Selection
-- Review of state-of-the-art deep learning architectures
-- Selection of suitable CNN-based models for medical image classification
+Each notebook corresponds to a different experiment.
 
-### Data Preprocessing
+---
+
+## Experimental Setup
+
+Models tested include:
+- Inception-based architectures
+- EfficientNet variants
+- Transformers
+
+Each model was evaluated under the same preprocessing and augmentation pipeline for fair comparison.
+
+---
+
+## Data Processing
 - Image preprocessing and normalization
-- Data augmentation techniques to address class imbalance
+- Data augmentation to mitigate class imbalance
+- Train/validation/test split
 
-### Model Training
-- Training deep learning models for multiclass classification
-- Hyperparameter tuning and optimization
+---
 
-### Evaluation
-- Model evaluation on test set
-- Achieved **92% accuracy on test data**
+## Results
+- Best performing model achieved **92% accuracy on test set**
+- Systematic comparison of 12 architectures
+- Identification of best-performing CNN families for this task
 
 ---
 
@@ -30,7 +42,5 @@ Python, TensorFlow, Keras, Scikit-learn
 
 ---
 
-## Key Outcomes
-- High-performance classification model for skin cancer detection
-- Effective handling of imbalanced medical dataset
-- Strong generalization performance on unseen data
+## Notebooks
+All experiments are located in the `/notebooks` folder, each corresponding to a specific architecture.
