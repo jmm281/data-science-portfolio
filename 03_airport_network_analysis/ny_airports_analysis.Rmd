@@ -1,0 +1,1212 @@
+---
+title: |
+                 Aplicación de una Red Multicapa en R con muxViz 
+subtitle: | 
+              Preprocesamiento, Recolección y Visualización de Datos
+  
+              Curso 2024/2025
+
+
+author: | 
+  Juan Muelledes Mateos
+output: html_document
+---
+
+\
+
+<h2 style="color:red">
+1. Introducción 
+</h3>
+
+\
+
+En este documento rmarkdown, vamos a descargar la libreria MuxViz para la creación de redes neuronales multicapa, vamos a explorar en profundidad lo que hace esta libreria y vamos a aplicar estos conocimientos creando dos redes neuronales multicapa que trabajen con los datos relativos a los vuelos con origen y/o destino a Estados Unidos de Enero del 2019 y a los de Enero del 2020. En concreto, este trabajo tiene cuatro objetivos fundamentales:
+
+\
+
+* Instalación de la librería MuxViz y exploración de las funciones y capacidades de la librería.
+* Aplicación de los conocimientos creando una red neuronal multicapa relacionada con los datos de vuelo de Estados Unidos recopilados en Enero del 2019.
+* Empleo de las funciones otorgadas por MuxViz para realizar un estudio sobre la red multicapa.
+* Creación de una red neuronal multicapa relacionada con los datos de Enero del 2020 y estudio sobre la red para compararla a la red de 2019.
+
+\
+
+Finalmente, cabe mencionar que iremos describiendo todo el proceso a modo de poder así ir hablando de las dificultades y problemas que hayamos encontrado, así como de las soluciones empleadas. Y una vez explicado esto, procedemos a la primera sección.
+
+\
+
+<h2 style="color:red">
+2. La Libreria MuxViz 
+</h3>
+
+\
+
+En este apartado, vamos a instalar la librería muxViz y luego exploraremos las funciones de las que disponemos y sus capacidades. Para ello, primero debemos instalar la librería. Debido a que no existe el paquete en CRAN, primero deberemos instalar devtools con tal de poder descargar la libreria por GitHub, pero ya que estamos, tambien aprovecharemos para instalar otros paquetes esenciales para el proyecto:
+
+\
+
+```{r, echo = TRUE, eval = FALSE}
+
+list.of.packages <- c("devtools", "ggplot2", "grid", "ggraph", "igraph")
+
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+
+if(length(new.packages)) {
+  install.packages(new.packages)
+}
+
+```
+
+\
+
+Una vez instalado Devtools, ya podemos descargar muxViz por Github.
+
+\
+
+```{r, echo = TRUE, eval = FALSE}
+
+list.of.packages <- c("muxViz")
+
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+
+if(length(new.packages)) {
+  devtools::install_github("manlius/muxViz")
+  }
+
+
+
+
+```
+
+\
+
+Y con esto, ya tenemos la libreria muxViz instalada. La razón por la que hemos colocado la estrúctura de arriba para instalar las librerías es para que ese código pueda ser ejecutado siempre para la creación del archivo rmd pero que solo tenga que realizar el trabajo de instalación una vez.
+
+\
+
+Ahora, en cuanto a muxViz, es una librería que nos permite visualizar y analizar redes multicapas interconectadas. Permite el analisis de los siguientes datos multicapa: 
+
+\
+
+* Análisis de correlación multicapa.
+* Análisis de centralidad multicapa y representación anular.
+* Detección de estructuras de comunidad multicapa.
+* Reducibilidad estructural multicapa.
+* Análisis de motivos multicapa.
+* Visualización animada de procesos dinámicos y redes multicapa que varían en el tiempo.
+
+\
+
+También soporta el analisis y visualización de las siguientes redes neuronales multicapa:
+
+\
+
+* Redes Edge-colored
+* Multiplexes interconectados
+* Redes Interdependientes
+* Redes multicapa generales
+
+\
+
+Para poder mostrar un breve ejemplo de uso de la libreria muxViz, vamos a crear una red Edge-Colored sencilla. Para ello realizaremos los siguientes pasos:
+
+\
+
+##### (1) Primero, cargamos las librerias.
+
+\
+
+```{r}
+library(ggplot2)
+library(ggraph)
+library(grid)
+library(igraph)
+library(muxViz)
+library(dplyr)
+library(gridExtra)
+library(png)
+library(grid)
+```
+\
+
+##### (2) Creamos la red especificando el número de nodos, de capas y realizando las operaciones necesarias.
+
+```{r, echo = TRUE}
+
+layers = 3
+nodos = 100
+node_tensor = list()
+
+g <- sample_pa(n = nodos, power = 1, m = 1, directed = FALSE)     #Crea un grafo aleatorio a partir del número de nodos que tenemos. Debido al uso de m=1, en cada paso solo se añadirá un arco no dirigido.
+g_list <- list()
+
+for (l in 1:layers) {
+  
+    g_list[[l]] <- delete_edges(g, sample(E(g), floor(0.2 * length(E(g))))) #Para cada capa, se eliminará un número de ejes aleatorios del grafo creado equivalente al 20% de los que haya (si hay 100, se eliminan 20).
+    node_tensor[[l]] <- as_adjacency_matrix(g_list[[l]])                    #La lista obtenida del paso anterior se convierte a una matriz de adyacencia para poder ser empleada como el tensor de nodos de esta capa.
+
+}
+
+
+```
+
+\
+
+##### (3) Creamos el tensor de capas y lo empleamos junto al tensor de nodos para crear el tensor multicapa de adyacencia.
+
+```{r, echo = TRUE}
+
+layer_tensor <- diagR(c(1, 1), 3, 1) + diagR(c(1, 1), 3, -1) #Creamos matrices diagonales de adyacencia entre las capas como el tensor de capas
+multilayer_tensor <- BuildSupraAdjacencyMatrixFromEdgeColoredMatrices(node_tensor, layer_tensor, layers, nodos) #Creamos la red edge-colored a partir del tensor de nodos (matrices de adyacencia de nodos), el tensor de capas (matrices de                                                                                                   adyacencia de las capas) y el número de nodos y capas.
+
+```
+
+\
+
+Después de este ejemplo de red neuronal, vamos a empezar a definir que cosas podemos hacer en muxViz, viendo las funciones disponibles:
+
+\
+
+<h4 style="color:red">
+2.1 Funciones de creación de redes
+</h3>
+
+\
+
+Antes de comenzar a ver las funciones, cabe mencionar que no vamos a mencionarlas todas, ya que sería un trabajo extenso y hay funciones que no emplearemos como todas aquellas relacionadas con los Multiplex.
+
+\
+
+* BuildExtendedEdgelistFromSupraAdjacencyMatrix(): A partir de una matriz de supra-adyacencia como las que hemos obtenido antes, podemos obtener una lista detallada sobre los ejes que conforman la red.
+* BuildLayersTensor(): A partir de un número de capas y un parametro de peso, podemos definir la matriz tensora de las capas. Podemos hacer el tensor de esta manera o con la matriz diagonal obtenida en los ejemplos anteriores.
+* BuildSupraAdjacencyMatrixFromEdgeColoredMatrices(): A partir del tensor de nodos, el tensor de capas y el número de nodos y de capas podemos crear la matriz de supra-adyacencia de la red.
+* BuildSupraAdjacencyMatrixFromExtendedEdgelist(): A partir de una lista detallada de los ejes de la red, podemos obtener la matriz de supra-adyacencia.
+* SupraAdjacencyToNetworkList(): A partir de la matriz de adyacencia, obtenemos una lista de objetos iGraph, correspondientes cada uno a una capa.
+* SupraAdjacencyToNodesTensor(): A partir de la matriz de adyacencia, obtenemos el tensor de nodos de la red.
+
+\
+
+<h4 style="color:red">
+2.2 Obtención de redes agregadas
+</h3>
+
+\
+
+* GetAggregateMatrix(): A partir de un tensor de nodos, obtenemos la matriz agregada
+* GetAggregateMatrixFromSupraAdjacencyMatrix() : A partir de la matriz de supra-adyacencia, obtenemos la matriz agregada.
+* GetAggregateNetworkFromSupraAdjacencyMatrix(): A partir de la matriz de supra-adyacencia, obtenemos la red agregada.
+
+\
+
+<h4 style="color:red">
+2.3 Información de centralidad
+</h3>
+
+\
+
+* GetMultiAuthCentrality(): calcula la multi-centralidad de autoridad, que mide como de influyente es un nodo considerando la capacidad de recibir conexiones de nodos importantes.
+* GetMultiClosenessCentrality(): Calcula la multi-centralidad de cercanía, que mide como de central es un nodo teniendo en cuenta la distancia total a todos los demás nodos en una red.
+* GetMultiEigenvectorCentrality(): calcula la multi-centralidad de eigenvector, que mide como de influyente es un nodo considerando la capacidad de recibir conexiones de nodos importantes.
+* GetMultiHubCentrality(): calcula la multi-centralidad de hub, que mide como de capaz es un nodo para actuar como un punto de redistribución a otros nodos importantes.
+* GetMultiKCoreCentrality(): calcula la multi-centralidad del k-core, que mide la importancia de un nodo en función de la densidad y cohesión de sus conexiones.
+* GetMultiKatzCentrality(): calcula la multi-centralidad de Katz, que mide la importancia de un nodo considerando tanto sus conexiones directas como indirectas.
+* GetMultiPageRankCentrality(): calcula la multi-centralidad de PageRank, que mide la importancia del nodo al distribuir su peso o influencia a traves de sus conexiones.
+
+\
+
+* GetMultiDegree(): calcula el multigrado total de la red sin tener en cuenta interlinks.
+* GetMultiDegreeSum(): calcula la suma del multigrado total de la red incluyendo interlinks.
+* GetMultiInDegree(): calcula el multigrado total de entrada de la red sin tener en cuenta interlinks.
+* GetMultiInDegreeSum(): calcula la suma del multigrado total de entrada de la red incluyendo interlinks.
+* GetMultiOutDegree(): calcula el multigrado total de salida la red sin tener en cuenta interlinks.
+* GetMultiOutDegreeSum(): calcula la suma del multigrado total de salida de la red incluyendo interlinks.
+* GetMultiStrength(): calcula la fuerza total de la red sin tener en cuenta interlinks.
+* GetMultiStrengthSum(): calcula la suma de la fuerza total de la red incluyendo interlinks.
+* GetMultiInStrength(): calcula la fuerza total de entrada de la red sin tener en cuenta interlinks.
+* GetMultiInStrengthSum(): calcula la suma de la fuerza total de entrada de la red incluyendo interlinks.
+* GetMultiOutStrength(): calcula la fuerza total de salida de la red sin tener en cuenta interlinks.
+* GetMultiOutStrengthSum(): calcula la suma de la fuerza total de salida de la red incluyendo interlinks.
+
+\
+
+<h4 style="color:red">
+2.4 Estructura Mesoscale
+</h3>
+
+\
+
+* GetConnectedComponents(): Devuelve los componentes asignados a cada nodo.
+* GetGiantConnectedComponent(): Devuelve el componente conectado más grande.
+* GetGiantIntersectionComponent(): Devuelve el componete conectado más grande obtenido por interseccionar el LCC de cada capa.
+* GetGiantViableComponent(): Devuelve el mayor clúster posible.
+
+\
+
+Una vez después de haber visto algunas de las funciones más utiles de muxViz, pasaremos a ver el auténtico proyecto, que es la implementación de una red neuronal multicapa que trabaje con los datos relacionados a los vuelos de Estados Unidos en Enero de 2019. Para ello, en la siguiente sección describiremos brevemente el dataset.
+
+\
+
+<h2 style="color:red">
+3. El Dataset
+</h2>
+
+\
+
+En cuanto a los datasets que vamos a emplear, como ya hemos mencionado, tratan sobre los vuelos de Estados Unidos durante el mes de Enero del 2019 y del 2020. Poseen cada uno más de 400.000 filas y tienen 21 columnas con información de cada vuelo. Lo que haremos será primero cargar el dataset y ver una pequeña muestra con tal de observar que columnas hay, las cuales explicaremos después.
+
+\
+
+```{r, echo = TRUE}
+
+dataset <- read.csv("Jan_2019_ontime.csv", header = T, sep = ",")
+head(dataset)
+
+```
+
+\
+
+Como se puede ver, disponemos de 21 columnas que contienen información sobre cada vuelo. Ahora, procederemos a nombrar cada columna y que significa con tal de dar contexto e información:
+
+* DAY_OF_MONTH: Valor numérico que nos dice el día del mes en el que se ha producido el vuelo.
+* DAY_OF_WEEK: Valor numérico que nos dice el día de la semana en el que se ha producido el vuelo (1 para lunes, 2 para martes... y 7 para domingo).
+* OP_UNIQUE_CARRIER: Cadena que nos sirve para identificar a una compañía aerea. Los códigos pueden haber sido empleados por otras compañías, así que para diferenciarlos las compañías que los hayan empleado anteriormente tendrán un sufijo numérico (como (1), (2), etc).
+* OP_CARRIER_AIRLINE_ID: Valor numérico otorgado por US DOT para identificar a una compañía aerea. 
+* OP_CARRIER: Cadena que nos sirve para identificar a una compañía aerea. A diferencia de OP_UNIQUE_CARRIER, aquí no se realizan distinciones si varias compañías han empleado el mismo código, así que es posible que los valores no sean únicos.
+* TAIL_NUM: Código que nos sirve para identificar un avión, ya que lo tendrá siempre en la cola.
+* OP_CARRIER_FL_NUM: Valor numérico que nos sirve para identificar el vuelo.
+* ORIGIN_AIRPORT_ID: Valor numérico que nos sirve para identificar el aeropuerto de orígen del vuelo.
+* ORIGIN_AIRPORT_SEQ_ID: Valor numérico que nos sirve para identificar el aeropuerto de orígen del vuelo en un momento determinado de tiempo. Es decir, varía con cada vuelo.
+* ORIGIN: Cadena que nos sirve para identificar el aeropuerto de orígen. A diferencia de los anteriores, es el acrónimo del aeropuerto.
+* DEST_AIRPORT_ID: Valor numérico que nos sirve para identificar el aeropuerto de destino del vuelo.
+* DEST_AIRPORT_SEQ_ID: Valor numérico que nos sirve para identificar el aeropuerto de destino del vuelo en un momento determinado de tiempo. Es decir, varía con cada vuelo.
+* DEST: Cadena que nos sirve para identificar el aeropuerto de destino. A diferencia de los anteriores, es el acrónimo del aeropuerto.
+* DEP_TIME: Valor numérico que nos indica el tiempo de salida del vuelo. El formato es hhmm.
+* DEP_DEL15: Valor numérico que nos indica si el avión se ha retrasado en la salida. El valor será 0 si no se ha retrasado o se ha retrasado menos de 15 minutos, y será 1 si se ha retrasado 15 minutos o más.
+* DEP_TIME_BLK: Código que nos indica el intervalo de tiempo en el que ha salido el vuelo. Son intervalos horarios, por lo que el formato será 1400-1459. De nuevo, el formato de cada hora es hhmm.
+* ARR_TIME: Valor numérico que nos indica el tiempo de llegada del vuelo. El formato es hhmm.
+* ARR_DEL15: Valor numérico que nos indica si el avión se ha retrasado en la llegada El valor será 0 si no se ha retrasado o se ha retrasado menos de 15 minutos, y será 1 si se ha retrasado 15 minutos o más.
+* CANCELLED: Valor numérico que nos indica si el vuelo se ha cancelado. 0 si no se ha cancelado y 1 si sí.
+* DIVERTED: Valor numérico que nos indica si el vuelo ha tenido que variar su aeropuerto de destino. 0 si no, y 1 si sí.
+* DISTANCE: Valor numérico que nos indica la distancia entre el aeropuerto de orígen y destino. Está en millas.
+
+\
+
+El set de datos ya estaba bien preparado al no tener ningun valor faltante, por lo que no es necesario realizar tareas de validación ni limpieza de datos. Por ahora, solo hemos cargado los datos de 2019, pero cuando terminemos el analisis de la red de 2019, cargaremos los de 2020.
+
+\
+
+<h2 style="color:red">
+4. La creación de la red multicapa 2019
+</h2>
+
+\
+
+Ahora, vamos a empezar a diseñar la red multicapa en base a este dataset. A partir de los datos que tenemos, vamos a realizar lo siguiente:
+
+* Crearemos una red multicapa que relacione los vuelos entre los diferentes aeropuertos durante la primera semana de Enero 2019. El "peso" entre aeropuertos, con tal de hacer un analísis del tráfico y aeropuertos más comunes, será el número de vuelos que ha habido entre cada par de aeropuertos.
+* Realizaremos un estudio de diferentes puntos de análisis a partir de la red multicapa creada.
+
+En cuanto a los puntos de analisis, nos gustaría investigar lo siguiente:
+
+* Existencia de comunidades dentro de la primera semana.
+* Análisis de centralidad de aeropuertos con tal de detectar los aeropuertos más importantes, tanto para la semana completa, como para cada día individual.
+* Extracción de las rutas críticas dentro de la primera semana y de cada día individual.
+* Análisis de resilencia en la red al simular la eliminación de los aeropuertos más importantes.
+
+\
+
+Dicho esto, procedemos a crear la red multicapa:
+
+\
+
+````{R, echo = TRUE}
+
+unique_days = unique(dataset$DAY_OF_MONTH)
+unique_airports = unique(c(dataset$ORIGIN, dataset$DEST))
+
+layers <- list()
+
+for (day in 1:7) {
+
+  day_data <- dataset[dataset$DAY_OF_MONTH == day, ]
+  
+  flight_counts <- table(day_data$ORIGIN, day_data$DEST)
+  flight_counts_df <- as.data.frame(flight_counts)
+  colnames(flight_counts_df) <- c("ORIGIN", "DEST", "FLIGHTS")
+  
+  g <- graph_from_data_frame(d = flight_counts_df, directed = FALSE, vertices = data.frame(name = unique_airports))
+  E(g)$weight <- flight_counts_df$FLIGHTS  
+  layers[[as.character(day)]] <- g
+  
+}
+
+adj_matrices <- lapply(layers, as_adjacency_matrix, attr = "weight", sparse = FALSE)
+layer_tensor <- diagR(c(1, 1), 7, 1) + diagR(c(1, 1), 7, -1)
+multilayer_tensor <- BuildSupraAdjacencyMatrixFromEdgeColoredMatrices(adj_matrices, layer_tensor, 7, length(unique_airports))
+
+
+````
+
+\
+
+<h3 style="color:red">
+4.1 Análisis 2019: comunidades dentro de la red
+</h3>
+
+\
+
+Una vez creada la red, podemos realizar análisis con Infomap para poder detectar comunidades. No obstante, estos análisis los realizaremos a partir de la página web de Infomap y no desde la función en muxViz. Esto se debe a que muxViz no ha sido actualizado desde hace años mientras que Infomap sí, lo que provoca que la sentencia que emplea muxViz para llamar a Infomap no se pueda ejecutar, ya que ahora tiene argumentos ilegales porque han sido eliminados de Infomap. Por otro lado, tampoco podemos emplear la versión 0.x de Infomap, que sí funcionaría con muxViz, debido a que estoy trabajando en Windows y que al compilar el paquete no genera un ejecutable por lo que no podemos emplearlo. Así que lo que haremos será escribir en un archivo la estructura de nuestra red y hacer el análisis en Infomap web.
+
+\
+
+Para ello, primero guardamos el contenido de nuestra red en un archivo de texto: 
+
+\
+
+```{R, echo = TRUE, eval = FALSE}
+
+num_nodes = nrow(multilayer_tensor) / 7
+
+nodes <- data.frame(node_id = 1:length(unique_airports), node_name = unique_airports)
+edges <- data.frame(layer1 = numeric(), node1 = numeric(), layer2 = numeric(), node2 = numeric(), weight = numeric()) 
+
+for (i in 1:nrow(multilayer_tensor)) {
+  for (j in 1:ncol(multilayer_tensor)) {
+    if (multilayer_tensor[i, j] != 0) {
+      layer1 <- ceiling(i / num_nodes)
+      layer2 <- ceiling(j / num_nodes)
+      node1 <- (i - 1) %% num_nodes + 1
+      node2 <- (j - 1) %% num_nodes + 1
+      edges <- rbind(edges, c(layer1, node1, layer2, node2, multilayer_tensor[i, j]))
+    }
+  }
+}
+
+edges_df <- as.data.frame(edges, stringsAsFactors = FALSE)
+colnames(edges_df) <- c("layer1", "node1", "layer2", "node2", "weight")
+
+output_file <- "multilayer_network_infomap_with_nodes.txt"
+fileConn <- file(output_file)
+
+writeLines(c("# A multilayer network using explicit format", "# Generated with R", "*Vertices"), fileConn)
+write.table(nodes, file = output_file, append = TRUE, row.names = FALSE, col.names = FALSE, quote = TRUE)
+
+writeLines(c("*Multilayer"), fileConn)
+write.table(edges_df, file = output_file, append = TRUE, row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+close(fileConn)
+cat("La red multilayer ha sido exportada a", output_file, "en formato compatible con Infomap.\n")
+
+
+
+```
+\
+
+Una vez hayamos obtenido el archivo de texto para su uso en la web, iremos a la web de Infomap y realizaremos el análisis de comunidades. Acto seguido, lo que haremos será cargar el archivo generado por infomap, generar un objeto dataframe para guardar las comunidades que haya detectado Infomap y finalmente, sacaremos unas gráficas que nos permitan ver el número de aeropuertos por comunidad y el porcentaje de miembros que tiene cada comunidad.
+
+\
+
+```{r, echo = TRUE}
+
+clu_file <- "multilayer_network_infomap_with_nodes_2019.txt.clu"
+
+clu_data <- readLines(clu_file)
+clu_data <- clu_data[!grepl("^#", clu_data)]  
+
+clu_df <- read.table(text = clu_data, header = FALSE, col.names = c("node_id", "community_id", "flow"))
+
+community_summary <- aggregate(flow ~ community_id, data = clu_df, FUN = sum)
+community_summary$count <- table(clu_df$community_id)
+community_summary$percentage <- (community_summary$count / sum(community_summary$count)) * 100
+
+
+ggplot(community_summary, aes(x = factor(community_id), y = count)) + geom_bar(stat = "identity", fill = "steelblue") + labs(title = "Número de nodos por comunidad", x = "ID de la comunidad",
+ y = "Cantidad de nodos") + theme_minimal()
+
+```
+
+\
+
+Ahora, vamos a enseñar la gráfica de la proporcion de nodos por comunidad, y acto seguido, analizaremos los resultados obtenidos.
+
+\
+
+``` {r, echo = TRUE}
+
+community_summary$label <- paste0("C", community_summary$community_id, ": ", round(community_summary$percentage, 2), "%")
+
+ggplot(community_summary, aes(x = "", y = count, fill = factor(community_id))) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  labs(title = "Proporción de nodos por comunidad") +
+  theme_void() +
+  theme(legend.title = element_blank())
+
+
+
+```
+
+\
+
+Como se puede observar en las dos gráficas, existen 74 comunidades dentro de esta red. Es un número muy elevado de comunidades y existen grandes diferencias entre unas comunidades y otras:
+
+* Primero, podemos observar que la comunidad 1 es la más grande y con mucha diferencia, agrupando más de 200 aeropuertos. Esto significa que dentro de la red, existe un grupo de aeropuertos muy fuertemente conectado donde los vuelos entre ellos son frecuentes y son seguramente destinos populares entre sí.
+* Segundo, podemos encontrar un número relativamente elevado de comunidades con 2 aeropuertos o más (en concreto, serían las comunidades 2 a 16 y la comunidad 26). Esto dentro de nuestra red significa que existen grupos de aeropuertos regionales bien conectados entre sí que no se conectan fuertemente con el resto de grupos. Un ejemplo de esto con tal de entenderlo más claro podría ser que hubiese en un estado geograficamente grande 3 aeropuertos con muchos vuelos frecuentes entre sí pero con muy pocos vuelos a cualquier otra destinación.
+* Finalmente, podemos encontrar un grán número de comunidades con un único aeropuerto cada uno. Esto sugiere que son aeropuertos muy poco conectados con cualquier otro aeropuerto, ya sea porque son destinos poco interesantes o por encontrarse en regiones remotas.
+
+\
+
+Habiendo realizado este estudio de comunidades, vamos a realizar análisis de centralidad con tal de identificar los aeropuertos más importantes.
+
+\
+
+<h3 style="color:red">
+4.2 Análisis 2019: centralidades y aeropuertos más importantes.
+</h3>
+
+\
+
+Ahora, vamos a identificar los aeropuertos clave dentro de nuestra red. Para ello, emplearemos medidas de centralidad con tal de identificarlos. Podemos basarnos en 3 criterios con tal de obtener aeropuertos clave.
+
+* Centralidad de grado: Aeropuertos con más conexiones directas.
+* Centralidad de eigenvector: Aeropuertos con conexiones a otros nodos importantes.
+* PageRank: Aeropuertos con importancia basada en un modelo de propagación PageRank.
+
+\
+
+Ahora bien, existen dos maneras de hacer esto:
+
+* La primera opción es calcular estos valores de centralidad para cada aeropuerto y para cada día empleando las funciones básicas degree, eigen_centrality... Esto nos permitirá ver para cada día cuales son los aeropuertos más importantes.
+* La segunda opción es emplear las funciones que nos otorga muxViz de centralidades, como multiPageRankCentrality, multiEigenvectorCentrality... Esto nos permitirá ver cuales son los aeropuertos más importantes para la semana completa.
+
+\
+
+Lo que nosotros haremos será las dos opciones. Primero implementaremos el código necesario para poder revisar cada día y después emplearemos las funciones de muxViz para la semana completa.
+
+\
+
+<h4 style="color:red">
+4.2.1 Análisis de centralidad 2019: dias individuales.
+</h4>
+
+\
+
+Para esta sección, lo que haremos será emplear las funciones de centralidad básicas para calcular los valores de centralidad de cada aeropuerto y de cada día. Después, implementaremos un sistema que nos permita crear gráficas para ver los mejores aeropuertos en un dia concreto.
+
+\
+
+```{r, echo = TRUE}
+
+supra_adj_matrix <- as.matrix(multilayer_tensor)
+
+airport_names <- unique_airports
+num_nodes <- nrow(multilayer_tensor) / 7
+layer_ids <- rep(1:7, times = num_nodes)
+node_names <- paste(airport_names, "Layer", layer_ids, sep = "_")
+
+network_graph <- graph_from_adjacency_matrix(supra_adj_matrix, mode = "directed", weighted = TRUE)
+V(network_graph)$name <- node_names  
+
+# Calcular medidas de centralidad
+degree_centrality <- degree(network_graph, mode = "all")
+eigenvector_centrality <- eigen_centrality(network_graph, directed = TRUE)$vector
+pagerank_scores <- page_rank(network_graph, directed = TRUE)$vector
+
+centrality_df <- data.frame(
+  Airport = sub("_Layer_.*", "", V(network_graph)$name),  
+  Layer = sub(".*_Layer_", "", V(network_graph)$name),   
+  Degree = degree_centrality,
+  Eigenvector = eigenvector_centrality,
+  PageRank = pagerank_scores
+)
+
+centrality_df$Layer <- as.factor(centrality_df$Layer)
+
+```
+
+\
+
+Ahora, habiendo obtenido ya las medidas de centralidad, procedemos a implementar el código que nos mostrará en gráficas los aeropuertos más importantes por dia:
+
+\
+
+```{r, echo = TRUE}
+
+plot_top_centrality <- function(data, metric, title, layer_filter = NULL, top_n = 10) {
+  
+  if (!is.null(layer_filter)) {
+    data <- data %>% filter(Layer == layer_filter)
+  }
+  
+  top_airports <- data %>%
+    group_by(Layer) %>%
+    slice_max(order_by = .data[[metric]], n = top_n) %>%
+    ungroup()
+  
+  top_airports$Layer <- as.factor(top_airports$Layer) 
+  
+  ggplot(top_airports, aes(x = reorder(Airport, -.data[[metric]]), y = .data[[metric]], fill = Layer)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(title = title, x = "Airport", y = metric) +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    scale_fill_brewer(palette = "Set3")
+}
+
+selected_day <- 1
+
+number_airports = 10
+
+p1 <- plot_top_centrality(centrality_df, "Degree", paste("Top Airports by \nDegree - Day", selected_day), layer_filter = selected_day, top_n = number_airports)
+p2 <- plot_top_centrality(centrality_df, "Eigenvector", paste("Top Airports by \nEigenvector - Day", selected_day), layer_filter = selected_day, top_n = number_airports)
+p3 <- plot_top_centrality(centrality_df, "PageRank", paste("Top Airports by \nPageRank - Day", selected_day), layer_filter = selected_day, top_n = number_airports)
+
+p1 <- p1 + theme(plot.margin = margin(t = 10, r = 20, b = 10, l = 20))
+p2 <- p2 + theme(plot.margin = margin(t = 10, r = 20, b = 10, l = 20))
+p3 <- p3 + theme(plot.margin = margin(t = 10, r = 20, b = 10, l = 20))
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+
+```
+\
+
+Y con este sistema podemos obtener 3 gráficas por día que nos dicen cada una cuales son los mejores aeropuertos según la métrica. No obstante, no nos pararemos en esta sección para realizar análisis, ya que al tener que analizar 3 gráficas para cada día se podría facilmente empantanar este documento. Debido a esto, procederemos a la segunda sección del calculo de centralidades, donde sí realizaremos un analísis.
+
+\
+
+<h4 style="color:red">
+4.2.2 Análisis de centralidad 2019: la semana completa.
+</h4>
+
+\
+
+Ahora, vamos a realizar el mismo analisis de centralidades empleando las funciones explicadas de muxViz, getMultiPageRankCentrality() y similares. La diferencia fundamental es que no vamos calcular las centralidades de cada día, sino que obtendremos las centralidades de la semana completa. Para ello, emplearemos los equivalente de muxViz de las funciones de centralidad empleadas en la sección anterior.
+
+\
+```{r, echo = TRUE}
+
+degree_values <- GetMultiDegree(multilayer_tensor, 7, length(unique_airports), TRUE)
+multipage_values <- GetMultiPageRankCentrality(multilayer_tensor, 7, length(unique_airports))
+eigenvector_values <- GetMultiEigenvectorCentrality(multilayer_tensor, 7, length(unique_airports))
+
+metrics_df <- data.frame(
+  Node = unique_airports, 
+  Degree = apply(degree_values, 1, sum),
+  Eigenvector = apply(eigenvector_values, 1, sum),
+  MultiPage = apply(multipage_values, 1, sum)
+)
+
+plot_global_metrics <- function(data, metric, title, top_n = 10) {
+  top_nodes <- data %>%
+    slice_max(order_by = .data[[metric]], n = top_n)
+  
+  ggplot(top_nodes, aes(x = reorder(Node, -.data[[metric]]), y = .data[[metric]])) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    coord_flip() +
+    labs(title = title, x = "Airport", y = metric) + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 14)
+    )
+}
+
+number_airports = 10
+
+p1 <- plot_global_metrics(metrics_df, "Degree", "Top Airports by \nDegree", top_n = number_airports)
+p2 <- plot_global_metrics(metrics_df, "Eigenvector", "Top Airports by \nEigenvector ", top_n = number_airports)
+p3 <- plot_global_metrics(metrics_df, "MultiPage", "Top Airports by \nPageRank ", top_n = number_airports)
+
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+
+
+
+
+```
+\
+
+Para concluir esta sección vamos a realizar un análisis sobre los resultados obtenidos con el estudio de la centralidad.
+
+\
+
+Primero, hablaremos de los resultados obtenidos al tener como métrica el Degree. Al emplear el Degree los mejores resultados son:
+
+* DFW, Dallas-Fort Worth, que es el aeropuerto más transitado de Texas.  
+* ATL, Atlanta Hartsfield-Jackson, que es el aeropuerto internacional de Atlanta.
+* ORD, Chicago O'Hare, que es el aeropuerto principal de Chicago, Illinois.
+* DEN, Denver International Airport, que es el aeropuerto principal de Denver, además de ser el aeropuerto más grande de Estados Unidos.
+* CLT, Charlotte Douglas, que es el aeropuerto más importante de Caronlina del Norte
+* IAH, George Bush International, que es otro aeropuerto importante de Texas.
+* MSP, Mineapolis-Saint Paul, que es el aeropuerto principal de Minnesota.
+* PHX, Phoenix Sky-Harbor, que es el aeropuerto princpal de PHoenix, Arizona
+* DTW, Detroit Metro Airport, que es el aeropuerto más transitado de Michigan.
+* LAS, Harry Reid International, aeropuerto de Nevada cercano a las Vegas.
+
+Por ahora, como se podía llegar a preveer, los aeropuertos más importantes en cuanto a Degree son todos aeropuertos internacionales y los aeropuertos "principales" de cada estado. Ahora, vamos a revisar los aeropuertos según el Eigenvector centrality, que mide la capacidad de un aeropuerto en cuanto a sus conexiones con otros aeropuertos importantes:
+
+* ATL, Atlanta Hartsfield-Jackson, que es el aeropuerto internacional de Atlanta.
+* ORD, Chicago O'Hare, que es el aeropuerto principal de Chicago, Illinois.
+* LAX, Los Angeles International, que es el aeropuerto principal de Los Angeles en California.
+* LGA, La Guardia International, que es el aeropuerto principal de New York.
+* DFW, Dallas-Fort Worth, que es el aeropuerto más transitado de Texas.
+* DEN, Denver International Airport, que es el aeropuerto principal de Denver, además de ser el aeropuerto más grande de Estados Unidos.
+* LAS, Harry Reid International, aeropuerto de Nevada cercano a las Vegas.
+* BOS, Boston Logan International, aeropuerto principal de Massachussets.
+* SFO, San Francisco International, aeropuerto principal de San Francisco.
+* CLT, Charlotte Douglas, que es el aeropuerto más importante de Caronlina del Norte
+
+De nuevo, los aeropuertos más importantes son los aeropuertos principales de los estados. También hemos podido observar que muchos de los mejores aeropuertos en cuanto a Degree también han aparecido en la lista de eigenvector. Para acabar, vamos a checkear la importancia de los aeropuertos según MultiPage:
+
+* ATL, Atlanta Hartsfield-Jackson, que es el aeropuerto internacional de Atlanta.
+* ORD, Chicago O'Hare, que es el aeropuerto principal de Chicago, Illinois.
+* DFW, Dallas-Fort Worth, que es el aeropuerto más transitado de Texas.
+* DEN, Denver International Airport, que es el aeropuerto principal de Denver, además de ser el aeropuerto más grande de Estados Unidos.
+* CLT, Charlotte Douglas, que es el aeropuerto más importante de Caronlina del Norte
+* LAX, Los Angeles International, que es el aeropuerto principal de Los Angeles en California.
+* IAH, George Bush International, que es otro aeropuerto importante de Texas.
+* PHX, Phoenix Sky-Harbor, que es el aeropuerto princpal de PHoenix, Arizona
+* MSP, Mineapolis-Saint Paul, que es el aeropuerto principal de Minnesota.
+* SFO, San Francisco International, aeropuerto principal de San Francisco.
+
+\
+
+Podemos volver a ver que los aeropuertos más importantes son los que de nuevo han obtenido los mejores resultados. Es más, podemos aventurar que si aumentasemos la lista al top 15, todos los aeropuertos distintos que hemos visto entre las 3 listas aparecerían. Ahora, después de haber revisado y diseñado sistemas para visualizar los mejores aeropuertos según diferentes valores de centralidad, vamos a buscar en nuestro sistema e identificar las rutas críticas de vuelo.
+
+\
+
+<h3 style="color:red">
+4.3 Análisis 2019: Rutas críticas.
+</h3>
+
+\
+
+En esta sección lo que estudiaremos serán las rutas críticas dentro de nuestra red, que para nosotros son las rutas que se han empleado más veces. Para ello, lo que haremos será analizar las  rutas más importantes para cada día y las rutas más importantes para la semana en su totalidad.
+
+\
+
+<h4 style="color:red">
+4.3.1 Rutas críticas 2019: Dias Individuales.
+</h4>
+
+\
+
+En esta sección vamos a enseñar el código que hemos realizado para poder visualizar cuales son las rutas más importantes para cada día. Como en la sección anterior, no realizaremos un analisis de los resultados obtenidos al emplear dias individuales, eso lo reservamos para cuando veamos las rutas críticas por semana.
+
+\
+```{r, echo = TRUE, error = TRUE}
+
+selected_day <- 3 
+layer_start <- (selected_day - 1) * num_nodes + 1
+layer_end <- selected_day * num_nodes
+day_tensor <- multilayer_tensor[layer_start:layer_end, layer_start:layer_end]
+
+num_top_routes <- 10  
+day_edge_list <- which(day_tensor != 0, arr.ind = TRUE)
+day_edge_weights <- day_tensor[day_edge_list]
+top_day_edges <- day_edge_list[order(-day_edge_weights), , drop = FALSE]
+top_day_weights <- day_edge_weights[order(-day_edge_weights)][1:nrow(top_day_edges)]
+
+routes_df <- data.frame(
+  Origin_Airport = unique_airports[top_day_edges[, 1]],  
+  Destination_Airport = unique_airports[top_day_edges[, 2]], 
+  Weight = top_day_weights
+)
+
+routes_df <- routes_df %>%
+  mutate(
+    Airport_Pair = ifelse(
+      Origin_Airport < Destination_Airport,
+      paste(Origin_Airport, Destination_Airport, sep = " - "),
+      paste(Destination_Airport, Origin_Airport, sep = " - ")
+    )
+  ) %>%
+  distinct(Airport_Pair, .keep_all = TRUE) %>%  
+  select(Origin_Airport, Destination_Airport, Weight)  
+
+print(head(routes_df))
+```
+\
+
+```{r}
+
+imagen = readPNG("image1.png")
+grid.raster(imagen)
+
+```
+
+\
+
+Ahora, vamos a hacer lo mismo, pero para toda la semana.
+
+\
+
+<h4 style="color:red">
+4.3.2 Rutas críticas 2019: Semana completa.
+</h4>
+
+\
+
+```{r, echo = TRUE, error = TRUE}
+
+aggregated_matrix <- matrix(0, nrow = num_nodes, ncol = num_nodes)
+
+for (day in 1:7) {
+  layer_start <- (day - 1) * num_nodes + 1
+  layer_end <- day * num_nodes
+  aggregated_matrix <- aggregated_matrix + multilayer_tensor[layer_start:layer_end, layer_start:layer_end]
+}
+
+aggregated_edges <- which(aggregated_matrix != 0, arr.ind = TRUE)
+aggregated_weights <- aggregated_matrix[aggregated_edges]
+
+aggregated_routes_df <- data.frame(
+  Origin_Airport = airport_names[aggregated_edges[, 1]],
+  Destination_Airport = airport_names[aggregated_edges[, 2]],
+  Weight = aggregated_weights
+)
+
+aggregated_routes_df <- aggregated_routes_df[order(-aggregated_routes_df$Weight), ]
+
+aggregated_routes_df <- aggregated_routes_df %>%
+  mutate(Pair = paste(pmin(Origin_Airport, Destination_Airport), pmax(Origin_Airport, Destination_Airport), sep = " - ")) %>%
+  distinct(Pair, .keep_all = TRUE) %>%
+  select(-Pair)
+
+head(aggregated_routes_df)
+
+
+```
+\
+
+```{r}
+
+imagen = readPNG("image2.png")
+grid.raster(imagen)
+
+```
+
+\
+Como se puede ver, en muchas de las rutas críticas intervienen aeropuertos de los que antes hemos denominado como los más importantes a partir de varias métricas. Una vez dicho esto, procedemos a la fase final del análisis, que es realizar unas pruebas sobre la resiliencia del sistema al eliminar los aeropuertos más importantes.
+
+\
+
+<h3 style="color:red">
+4.4 Análisis 2019: Test de resiliencia
+</h3>
+
+\
+
+En esta sección, lo que haremos será analizar la resiliencia de la red. Para ello, eliminaremos los nodos más importantes de la red y veremos como varía la red por cada día.
+
+\
+
+```{r, echo = TRUE}
+
+analyze_day_network <- function(multilayer_tensor, day) {
+  
+  num_airports <- nrow(multilayer_tensor) / 7
+  start_idx <- (day - 1) * num_airports + 1
+  end_idx <- day * num_airports
+  day_submatrix <- multilayer_tensor[start_idx:end_idx, start_idx:end_idx]
+  day_graph <- graph_from_adjacency_matrix(day_submatrix, mode = "directed", weighted = TRUE)
+  
+  
+  components <- components(day_graph)
+  original_giant <- max(components$csize)
+  centrality <- degree(day_graph, mode = "all")
+  key_airports <- order(-centrality)[1:10]
+  key_airports_names = unique_airports[key_airports]
+  
+  
+  day_graph_reduced <- delete_vertices(day_graph, key_airports)
+  
+  new_components <- components(day_graph_reduced)
+  new_giant <- max(new_components$csize)
+  diameter <- diameter(day_graph_reduced, directed = TRUE, unconnected = TRUE)
+  num_components <- length(new_components$csize)
+  
+  return(list(Day_Checked = day, Original_Giant = original_giant, New_Giant = new_giant, Num_Components_old = length(components$csize), Num_Components_new = num_components, Diameter = diameter, Key_Airports = key_airports_names))
+  
+}
+
+result_day_3 <- analyze_day_network(multilayer_tensor, day = 3)
+cat("Resultados del análisis para el día 3:\n")
+print(result_day_3)
+
+```
+\
+
+Para realizar una prueba, vamos a analizar los resultados obtenidos en el checkeo del dia 3:
+
+* Primero, se puede ver que el componente conexo más grande tenía 338 aeropuertos conectados. Es decir, había un gran grupo de 338 aeropuertos en los que, de una forma u otra, te podrías desplazar desde cualquiera a cualquiera de la red. No obstante, al eliminar los 10 aeropuertos más importantes (según Degree), el nuevo gigante pasa a tener 218 aeropuertos; esto significa que al eliminar los 10 aeropuertos más significativos, el mejor grupo pierde 120 miembros, lo que es un cambio sustancial.
+* Al realizar la eliminación, podemos ver que han pasado de haber 9 componentes a 113 componentes. Esto implica que la red se ha fragmentado significativamente después de la eliminación de los aeropuertos más importantes.
+* El diametro de 11 indica que, dentro del gigante, al menos los componentes internos están fuertemente conectados.
+
+\
+
+<h3 style="color:red">
+5. La red multicapa: 2020
+</h3>
+
+\
+
+En esta sección lo que haremos será crear la red multicapa a partir de la primera semana de datos de vuelos de Estados Unidos de 2020, con tal de ver como se compara a la red de 2019. Debido a que el código será el mismo, vamos a saltarnos las explicaciones que hemos hecho en la sección anterior, y vamos a ir directamente con los resultados y explicaciones.
+
+\
+
+```{R, echo = TRUE}
+  dataset <- read.csv("Jan_2020_ontime.csv", header = T, sep = ",")
+  head(dataset)
+```
+
+\
+
+Existe una ligera diferencia entre el dataset de 2019 y el de 2020, que es que el de 2020 tiene 5 aeropuertos más operativos, pasando de 346 a 351.
+
+\
+
+````{R, echo = TRUE}
+
+unique_days = unique(dataset$DAY_OF_MONTH)
+unique_airports = unique(c(dataset$ORIGIN, dataset$DEST))
+
+layers <- list()
+
+for (day in 1:7) {
+
+  day_data <- dataset[dataset$DAY_OF_MONTH == day, ]
+  
+  flight_counts <- table(day_data$ORIGIN, day_data$DEST)
+  flight_counts_df <- as.data.frame(flight_counts)
+  colnames(flight_counts_df) <- c("ORIGIN", "DEST", "FLIGHTS")
+  
+  g <- graph_from_data_frame(d = flight_counts_df, directed = FALSE, vertices = data.frame(name = unique_airports))
+  E(g)$weight <- flight_counts_df$FLIGHTS  
+  layers[[as.character(day)]] <- g
+  
+}
+
+adj_matrices <- lapply(layers, as_adjacency_matrix, attr = "weight", sparse = FALSE)
+layer_tensor <- diagR(c(1, 1), 7, 1) + diagR(c(1, 1), 7, -1)
+multilayer_tensor <- BuildSupraAdjacencyMatrixFromEdgeColoredMatrices(adj_matrices, layer_tensor, 7, length(unique_airports))
+
+
+````
+
+\
+
+<h3 style="color:red">
+5.1 Análisis 2020: comunidades dentro de la red
+</h3>
+
+\
+
+```{R, echo = FALSE, eval = FALSE}
+
+num_nodes = nrow(multilayer_tensor) / 7
+
+nodes <- data.frame(node_id = 1:length(unique_airports), node_name = unique_airports)
+edges <- data.frame(layer1 = numeric(), node1 = numeric(), layer2 = numeric(), node2 = numeric(), weight = numeric()) 
+
+for (i in 1:nrow(multilayer_tensor)) {
+  for (j in 1:ncol(multilayer_tensor)) {
+    if (multilayer_tensor[i, j] != 0) {
+      layer1 <- ceiling(i / num_nodes)
+      layer2 <- ceiling(j / num_nodes)
+      node1 <- (i - 1) %% num_nodes + 1
+      node2 <- (j - 1) %% num_nodes + 1
+      edges <- rbind(edges, c(layer1, node1, layer2, node2, multilayer_tensor[i, j]))
+    }
+  }
+}
+
+edges_df <- as.data.frame(edges, stringsAsFactors = FALSE)
+colnames(edges_df) <- c("layer1", "node1", "layer2", "node2", "weight")
+
+output_file <- "multilayer_network_infomap_with_nodes.txt"
+fileConn <- file(output_file)
+
+writeLines(c("# A multilayer network using explicit format", "# Generated with R", "*Vertices"), fileConn)
+write.table(nodes, file = output_file, append = TRUE, row.names = FALSE, col.names = FALSE, quote = TRUE)
+
+writeLines(c("*Multilayer"), fileConn)
+write.table(edges_df, file = output_file, append = TRUE, row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+close(fileConn)
+cat("La red multilayer ha sido exportada a", output_file, "en formato compatible con Infomap.\n")
+
+
+
+```
+\
+
+```{r, echo = TRUE}
+
+clu_file <- "multilayer_network_infomap_with_nodes_2020.txt.clu"
+
+clu_data <- readLines(clu_file)
+clu_data <- clu_data[!grepl("^#", clu_data)]  
+
+clu_df <- read.table(text = clu_data, header = FALSE, col.names = c("node_id", "community_id", "flow"))
+
+community_summary <- aggregate(flow ~ community_id, data = clu_df, FUN = sum)
+community_summary$count <- table(clu_df$community_id)
+community_summary$percentage <- (community_summary$count / sum(community_summary$count)) * 100
+
+
+ggplot(community_summary, aes(x = factor(community_id), y = count)) + geom_bar(stat = "identity", fill = "steelblue") + labs(title = "Número de nodos por comunidad", x = "ID de la comunidad",
+ y = "Cantidad de nodos") + theme_minimal()
+
+```
+
+\
+
+Ahora, vamos a enseñar la gráfica de la proporcion de nodos por comunidad para 2020, y acto seguido, analizaremos los resultados obtenidos.
+
+\
+
+``` {r, echo = TRUE}
+
+community_summary$label <- paste0("C", community_summary$community_id, ": ", round(community_summary$percentage, 2), "%")
+
+ggplot(community_summary, aes(x = "", y = count, fill = factor(community_id))) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  labs(title = "Proporción de nodos por comunidad") +
+  theme_void() +
+  theme(legend.title = element_blank())
+
+
+
+```
+
+\
+
+Como se puede observar entre las dos gráficas, existen 75 comunidades dentro de esta red. Es un número muy elevado de comunidades y existen grandes diferencias entre unas comunidades y otras:
+
+* Primero, podemos observar que la comunidad 1 es la más grande y con mucha diferencia, agrupando casi 250 aeropuertos. Esto significa que dentro de la red, existe un grupo de aeropuertos muy fuertemente conectado donde los vuelos entre ellos son frecuentes y son seguramente destinos populares entre sí.
+* Segundo, podemos encontrar un número relativamente elevado de comunidades con 2 aeropuertos o más (en concreto, serían las comunidades 2 a 14). Esto dentro de nuestra red significa que existen grupos de aeropuertos regionales bien conectados entre sí que no se conectan fuertemente con el resto de grupos. Un ejemplo de esto con tal de entenderlo más claro podría ser que hubiese en un estado geograficamente grande 3 aeropuertos con muchos vuelos frecuentes entre sí pero con muy pocos vuelos a cualquier otra destinación.
+* Finalmente, podemos encontrar un grán número de comunidades con un único aeropuerto cada uno. Esto sugiere que son aeropuertos muy poco conectados con cualquier otro aeropuerto, ya sea porque son destinos poco interesantes o por encontrarse en regiones remotas.
+
+\
+
+En cuanto a diferencias con respecto a la red de 2019, la única diferencia notable es que ahora hay una comunidad más y que la comunidad 1 de 2020 tiene ligeramente más miembros que la comunidad 1 de 2019.
+
+\
+
+<h3 style="color:red">
+5.2 Análisis 2020: centralidades y aeropuertos más importantes.
+</h3>
+
+\
+
+Ahora, vamos a identificar los aeropuertos clave dentro de nuestra red. Para ello, emplearemos la segunda opción que explicamos anteriormente, que es la de visualizar los aeropuertos más importantes de la semana entera, y no de cada dia por separado.
+
+\
+
+
+
+```{r, echo = TRUE}
+
+degree_values <- GetMultiDegree(multilayer_tensor, 7, length(unique_airports), TRUE)
+multipage_values <- GetMultiPageRankCentrality(multilayer_tensor, 7, length(unique_airports))
+eigenvector_values <- GetMultiEigenvectorCentrality(multilayer_tensor, 7, length(unique_airports))
+
+metrics_df <- data.frame(
+  Node = unique_airports, 
+  Degree = apply(degree_values, 1, sum),
+  Eigenvector = apply(eigenvector_values, 1, sum),
+  MultiPage = apply(multipage_values, 1, sum)
+)
+
+plot_global_metrics <- function(data, metric, title, top_n = 10) {
+  top_nodes <- data %>%
+    slice_max(order_by = .data[[metric]], n = top_n)
+  
+  ggplot(top_nodes, aes(x = reorder(Node, -.data[[metric]]), y = .data[[metric]])) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    coord_flip() +
+    labs(title = title, x = "Airport", y = metric) + 
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 14)
+    )
+}
+
+number_airports = 10
+
+p1 <- plot_global_metrics(metrics_df, "Degree", "Top Airports by \nDegree", top_n = number_airports)
+p2 <- plot_global_metrics(metrics_df, "Eigenvector", "Top Airports by \nEigenvector ", top_n = number_airports)
+p3 <- plot_global_metrics(metrics_df, "MultiPage", "Top Airports by \nPageRank ", top_n = number_airports)
+
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+
+
+
+
+```
+\
+
+Para concluir esta sección vamos a realizar un análisis sobre los resultados obtenidos con el estudio de la centralidad.
+
+\
+
+Primero, hablaremos de los resultados obtenidos al tener como métrica el Degree. Al emplear el Degree los mejores resultados son:
+
+* DFW, Dallas-Fort Worth, que es el aeropuerto más transitado de Texas.
+* ORD, Chicago O'Hare, que es el aeropuerto principal de Chicago, Illinois.
+* ATL, Atlanta Hartsfield-Jackson, que es el aeropuerto internacional de Atlanta.
+* DEN, Denver International Airport, que es el aeropuerto principal de Denver, además de ser el aeropuerto más grande de Estados Unidos.
+* CLT, Charlotte Douglas, que es el aeropuerto más importante de Caronlina del Norte
+* IAH, George Bush International, que es otro aeropuerto importante de Texas.
+* MSP, Mineapolis-Saint Paul, que es el aeropuerto principal de Minnesota.
+* DTW, Detroit Metro Airport, que es el aeropuerto más transitado de Michigan.
+* PHX, Phoenix Sky-Harbor, que es el aeropuerto princpal de PHoenix, Arizona
+* SLC, Salt Lake City Airport, que es el aeropuerto de Salt Lake City, en Utah.
+
+\
+
+Por ahora, con respecto a los aeropuertos más importantes según Degree de 2020 y en comparación a los de 2019, prácticamente nada ha cambiado: los aeropuertos principales siguen en la lista aunque algunos han cambiado de posición y la única diferencia notable es que el aeropuerto LAS, que estaba en decima posición en el año 2019, ahora ha dado paso al aeropuerto SLC. Ahora, vamos a revisar los aeropuertos según el Eigenvector centrality:
+
+* ATL, Atlanta Hartsfield-Jackson, que es el aeropuerto internacional de Atlanta.
+* ORD, Chicago O'Hare, que es el aeropuerto principal de Chicago, Illinois.
+* LAX, Los Angeles International, que es el aeropuerto principal de Los Angeles en California.
+* DFW, Dallas-Fort Worth, que es el aeropuerto más transitado de Texas.
+* DEN, Denver International Airport, que es el aeropuerto principal de Denver, además de ser el aeropuerto más grande de Estados Unidos.
+* LAS, Harry Reid International, aeropuerto de Nevada cercano a las Vegas.
+* BOS, Boston Logan International, aeropuerto principal de Massachussets.
+* LGA, La Guardia International, que es el aeropuerto principal de New York.
+* SFO, San Francisco International, aeropuerto principal de San Francisco.
+* CLT, Charlotte Douglas, que es el aeropuerto más importante de Caronlina del Norte
+
+De nuevo, en comparación entre 2019 y 2020, los resultados son prácticamente idénticos; el único cambio que ha habido es que el aeropuerto LGA ha bajado de la cuarta posición a la octava. Ahora, vamos a revisar los aeropuertos según MultiPageRank Centrality:
+
+* ATL, Atlanta Hartsfield-Jackson, que es el aeropuerto internacional de Atlanta.
+* DFW, Dallas-Fort Worth, que es el aeropuerto más transitado de Texas. de tercero a segundo
+* ORD, Chicago O'Hare, que es el aeropuerto principal de Chicago, Illinois.
+* DEN, Denver International Airport, que es el aeropuerto principal de Denver, además de ser el aeropuerto más grande de Estados Unidos.
+* CLT, Charlotte Douglas, que es el aeropuerto más importante de Caronlina del Norte
+* LAX, Los Angeles International, que es el aeropuerto principal de Los Angeles en California.
+* IAH, George Bush International, que es otro aeropuerto importante de Texas.
+* PHX, Phoenix Sky-Harbor, que es el aeropuerto princpal de PHoenix, Arizona
+* MSP, Mineapolis-Saint Paul, que es el aeropuerto principal de Minnesota.
+* DTW, Detroit Metro Airport, que es el aeropuerto más transitado de Michigan.
+
+\
+
+Para acabar la comparación entre aeropuertos cruciales de 2019 y 2020, cabe decir que la lista de 2019 y 2020 es extremadamente similar; la única diferencia es que el aeropuerto DFW ha subido al segundo puesto desde el tercero y que el aeropuerto DTW ha sustituido al SFO en el decimo puesto.
+
+\
+
+<h3 style="color:red">
+5.3 Análisis 2020: Rutas críticas.
+</h3>
+
+\
+
+```{r, echo = TRUE, error = TRUE}
+
+airport_names <- unique_airports
+
+aggregated_matrix <- matrix(0, nrow = num_nodes, ncol = num_nodes)
+
+for (day in 1:7) {
+  layer_start <- (day - 1) * num_nodes + 1
+  layer_end <- day * num_nodes
+  aggregated_matrix <- aggregated_matrix + multilayer_tensor[layer_start:layer_end, layer_start:layer_end]
+}
+
+aggregated_edges <- which(aggregated_matrix != 0, arr.ind = TRUE)
+aggregated_weights <- aggregated_matrix[aggregated_edges]
+
+aggregated_routes_df <- data.frame(
+  Origin_Airport = airport_names[aggregated_edges[, 1]],
+  Destination_Airport = airport_names[aggregated_edges[, 2]],
+  Weight = aggregated_weights
+)
+
+aggregated_routes_df <- aggregated_routes_df[order(-aggregated_routes_df$Weight), ]
+
+aggregated_routes_df <- aggregated_routes_df %>%
+  mutate(Pair = paste(pmin(Origin_Airport, Destination_Airport), pmax(Origin_Airport, Destination_Airport), sep = " - ")) %>%
+  distinct(Pair, .keep_all = TRUE) %>%
+  select(-Pair)
+
+head(aggregated_routes_df)
+
+
+```
+
+\
+
+```{r}
+
+imagen = readPNG("image3.png")
+grid.raster(imagen)
+
+```
+
+\
+
+En comparación a las rutas de 2019, podemos ver que las rutas críticas de 2020 son prácticamente las mismas; la única excepción a la regla es que la sexta ruta crítica del 2019 es MCO - ATL, que en 2020 pasa a ser FLL - ATL.  
+
+\
+
+<h3 style="color:red">
+5.4 Análisis 2020: Test de resiliencia
+</h3>
+
+\
+
+```{r, echo = TRUE}
+
+analyze_day_network <- function(multilayer_tensor, day) {
+  
+  num_airports <- nrow(multilayer_tensor) / 7
+  start_idx <- (day - 1) * num_airports + 1
+  end_idx <- day * num_airports
+  day_submatrix <- multilayer_tensor[start_idx:end_idx, start_idx:end_idx]
+  day_graph <- graph_from_adjacency_matrix(day_submatrix, mode = "directed", weighted = TRUE)
+  
+  
+  components <- components(day_graph)
+  original_giant <- max(components$csize)
+  centrality <- degree(day_graph, mode = "all")
+  key_airports <- order(-centrality)[1:10]
+  key_airports_names = unique_airports[key_airports]
+  
+  
+  day_graph_reduced <- delete_vertices(day_graph, key_airports)
+  
+  new_components <- components(day_graph_reduced)
+  new_giant <- max(new_components$csize)
+  diameter <- diameter(day_graph_reduced, directed = TRUE, unconnected = TRUE)
+  num_components <- length(new_components$csize)
+  
+  return(list(Day_Checked = day, Original_Giant = original_giant, New_Giant = new_giant, Num_Components_old = length(components$csize), Num_Components_new = num_components, Diameter = diameter, Key_Airports = key_airports_names))
+  
+}
+
+result_day_3 <- analyze_day_network(multilayer_tensor, day = 3)
+cat("Resultados del análisis para el día 3:\n")
+print(result_day_3)
+
+```
+\
+
+Para realizar una prueba, vamos a analizar los resultados obtenidos en el checkeo del dia 3:
+
+* Primero, se puede ver que el componente conexo más grande tenia 345 aeropuertos conectados. Es decir, había un gran grupo de 345 aeropuertos en los que, de una forma u otra, te podrías desplazar desde cualquiera a cualquiera de la red. No obstante, al eliminar los 10 aeropuertos más importantes (según Degree), el nuevo gigante pasa a tener 222 aeropuertos; esto significa que al eliminar los 10 aeropuertos más significativos, el mejor grupo pierde 123 miembros, lo que es un cambio sustancial. En comparación a los resultados de 2019, son muy similares, aunque podemos ver que en 2020 tanto el gigante original y el nuevo gigante tienen un mayor número de componentes que los de 2019.
+* Al realizar la eliminación, podemos ver que han pasado de haber 7 componentes a 116 componentes. Esto implica que la red se ha fragmentado significativamente después de la eliminación de los aeropuertos más importantes. En comparación a la red de 2019, podemos ver que la de 2020 antes de la eliminación es más compacta, ya que tiene dos componentes menos que la de 2019. No obstante, también podemos observar que después de la eliminación la red de 2020 está más fragmentada que la de 2019.
+* El diametro de 11 indica que, dentro del gigante, al menos los componentes internos están fuertemente conectados. Esto es idéntico al de la red de 2019.
+
+\
