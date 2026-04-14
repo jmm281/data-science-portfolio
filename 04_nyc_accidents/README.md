@@ -1,4 +1,4 @@
-# NYC Traffic Accident Analysis (2019–2024)
+# NYC Traffic Accident Analysis (2012–2024)
 
 ## Objective
 Exploratory and geospatial analysis of traffic accidents in New York City to identify patterns, risk factors, and high-risk areas.
