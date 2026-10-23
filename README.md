@@ -7,8 +7,6 @@ This repository contains a selection of academic and personal projects focused o
 
 ## Projects Included
 
-### Deep Learning
-- Skin Cancer Classification using CNNs (HAM10000 dataset)
 
 ### Recommendation Systems & Data Analysis
 - Airbnb Data Analysis & Recommendation System
